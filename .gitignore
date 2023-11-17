@@ -1,0 +1,6 @@
+bin/
+obj/
+transfer/docker
+test/
+*.log
+*.log.gz
