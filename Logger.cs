@@ -1,6 +1,7 @@
 using System.IO.Compression;
 
 public class Logger {
+    private static Semaphore semaphore = new Semaphore(1, 1);
     private static string barFull = "█", barEmpty = " ";
     private static string? logfilename;
     private static StreamWriter? logstream;
@@ -38,6 +39,7 @@ public class Logger {
     /// </summary>
     /// <param name="message">The message to output</param>
     public static void Success(string message) {
+        semaphore.WaitOne();
         string time = TimeString();
         Console.ForegroundColor = ConsoleColor.DarkGray;
         Console.Write(time);
@@ -47,6 +49,7 @@ public class Logger {
         Console.WriteLine(message);
         Console.ResetColor();
         if(logstream != null) logstream.WriteLineAsync(time + "(Success) " + message);
+        semaphore.Release();
     }
     /// <summary>
     /// Function to output an info message
@@ -54,6 +57,7 @@ public class Logger {
     /// </summary>
     /// <param name="message">The message to output</param>
     public static void Info(string message) {
+        semaphore.WaitOne();
         string time = TimeString();
         Console.ForegroundColor = ConsoleColor.DarkGray;
         Console.Write(time);
@@ -62,6 +66,7 @@ public class Logger {
         Console.ForegroundColor = ConsoleColor.White;
         Console.WriteLine(message);
         Console.ResetColor();
+        semaphore.Release();
     }
     /// <summary>
     /// Function to output a warning message
@@ -69,6 +74,7 @@ public class Logger {
     /// </summary>
     /// <param name="message">The message to output</param>
     public static void Warning(string message) {
+        semaphore.WaitOne();
         string time = TimeString();
         Console.ForegroundColor = ConsoleColor.DarkGray;
         Console.Write(time);
@@ -78,6 +84,7 @@ public class Logger {
         Console.WriteLine(message);
         Console.ResetColor();
         if(logstream != null) logstream.WriteLineAsync(time + "(Warning) " + message);
+        semaphore.Release();
     }
     /// <summary>
     /// Function to output an error message
@@ -85,6 +92,7 @@ public class Logger {
     /// </summary>
     /// <param name="message">The message to output</param>
     public static void Error(string message) {
+        semaphore.WaitOne();
         string time = TimeString();
         Console.ForegroundColor = ConsoleColor.DarkGray;
         Console.Write(time);
@@ -94,6 +102,7 @@ public class Logger {
         Console.WriteLine(message);
         Console.ResetColor();
         if(logstream != null) logstream.WriteLineAsync(time + "(Error) " + message);
+        semaphore.Release();
     }
     /// <summary>
     /// Function to clear the last console line
@@ -101,11 +110,13 @@ public class Logger {
     /// </summary>
     /// <param name="line">The line to remove, default 1</param>
     public static void RemoveLine(Int16 line = 1) {
+        semaphore.WaitOne();
         Int32 currentLineCursor = Console.CursorTop;
         Console.SetCursorPosition(0, currentLineCursor - line);
         for(Int32 i = 0; i < Console.WindowWidth; i++)
             Console.Write(" ");
         Console.SetCursorPosition(0, currentLineCursor - line);
+        semaphore.Release();
     }
     /// <summary>
     /// Function to get the string time
@@ -145,6 +156,7 @@ public class Logger {
         for(Int16 i = 1; i <= percent; i++) {
             bar += barFull;
         }
+        semaphore.WaitOne();
         Console.ForegroundColor = ConsoleColor.DarkYellow;
         Console.Write(bar);
         bar = "";
@@ -159,54 +171,7 @@ public class Logger {
         Console.ForegroundColor = ConsoleColor.DarkYellow;
         Console.WriteLine(bar);
         Console.ResetColor();
-    }
-    /// <summary>
-    /// Function to print a message of the file that is being copied
-    /// (<paramref name="reason"/>, <paramref name="file"/>)
-    /// </summary>
-    /// <param name="reason">The reason</param>
-    /// <param name="file">The name of the file</param>
-    public static void InfoReason(Reason reason, string file, UInt64? size = null) {
-        string line = "";
-        switch(reason) {
-            case Reason.CopyNotThere:
-                line = "Copying because not there: ";
-                break;
-            case Reason.CopyDifferentSize:
-                line = "Copying because different size: ";
-                break;
-            case Reason.CopyDifferentContent:
-                line = "Copying because different content: ";
-                break;
-            case Reason.Remove:
-                line = "Removing: ";
-                break;
-        }
-        Info(line + file + " (" + ((size != null) ? HumanReadableSize((UInt64)size) : "folder") + ")");
-    }
-    /// <summary>
-    /// Function to print a message of the file that has been copied
-    /// (<paramref name="reason"/>, <paramref name="file"/>)
-    /// </summary>
-    /// <param name="reason">The reason</param>
-    /// <param name="file">The name of the file</param>
-    public static void SuccessReason(Reason reason, string file, UInt64? size = null) {
-        string line = "";
-        switch(reason) {
-            case Reason.CopyNotThere:
-                line = "Copied because not there: ";
-                break;
-            case Reason.CopyDifferentSize:
-                line = "Copied because different size: ";
-                break;
-            case Reason.CopyDifferentContent:
-                line = "Copied because different content: ";
-                break;
-            case Reason.Remove:
-                line = "Removed: ";
-                break;
-        }
-        Success(line + file + " (" + ((size != null) ? HumanReadableSize((UInt64)size) : "folder") + ")");
+        semaphore.Release();
     }
     /// <summary>
     /// Function to print a progress bar string

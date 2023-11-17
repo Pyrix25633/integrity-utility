@@ -1,24 +1,21 @@
 using System;
 using System.IO.Compression;
+using Newtonsoft.Json;
 
 public class Program {
     private static Arguments arguments = new Arguments();
     private static EnumerationOptions enumOptions = new EnumerationOptions();
     static async Task Main(string[] args) {
         // Version
-        string version = "1.6.1";
+        string version = "1.0.0";
         // Lists and dictionaries
-        string[] sourceList = new string[0], destinationList = new string[0], extensionList = new string[0];
-        Dictionary<string, DirectoryEntry> sourceInfoDictionary = new Dictionary<string, DirectoryEntry>();
-        Dictionary<string, DirectoryEntry> destinationInfoDictionary = new Dictionary<string, DirectoryEntry>();
-        DirectoryEntry[] toCopyList = new DirectoryEntry[0], toRemoveFileList = new DirectoryEntry[0], toRemoveFolderList = new DirectoryEntry[0];
+        string[] pathList = new string[0], extensionList = new string[0];
+        Dictionary<string, DirectoryEntry> pathInfoDictionary = new Dictionary<string, DirectoryEntry>();
+        Dictionary<string, string> indexDictionary = new Dictionary<string, string>();
         enumOptions.RecurseSubdirectories = true; enumOptions.AttributesToSkip = default;
         // Other variables
-        Int32 length, filesToCopy, filesCopied, foldersToCopy, foldersCopied,
-            filesToRemove, filesRemoved, foldersToRemove, foldersRemoved, sleepTime;
-        UInt64 sizeToCopy, sizeCopied, sizeToRemove, sizeRemoved;
         Int64 timestamp;
-        string backupFolder = "";
+        Int32 sleepTime;
         // Parsing arguments
         try {
             arguments.Parse(args);
@@ -38,61 +35,28 @@ public class Program {
         // Initialize logger
         Logger.InitializeLogging(arguments.log);
         // Logging Info
-        Logger.Info("Backup utility " + version);
+        Logger.Info("Integrity utility " + version);
         // Source
-        Logger.Info("Source folder: " + arguments.source);
-        if(!Directory.Exists(arguments.source)) {
-            Logger.Error("Source folder does not exist!");
+        Logger.Info("Path: " + arguments.path);
+        if(!Directory.Exists(arguments.path)) {
+            Logger.Error("Directory does not exist!");
             return;
         }
-        // Destination
-        Logger.Info("Destination folder: " + arguments.destination);
-        if(!Directory.Exists(arguments.destination)) {
-            Logger.Warning("Destination folder does not exist, attempting creation");
-            try {
-                Directory.CreateDirectory(arguments.destination);
-                Logger.Success("Destination directory created");
-            }
-            catch(Exception e) {
-                Logger.Error("Destination directory creation failed, error: " + e);
-                return;
-            }
-        }
         // Getting full path
-        arguments.source = new FileInfo(arguments.source).FullName;
-        arguments.destination = new FileInfo(arguments.destination).FullName;
-        // Removed
-        if(arguments.removed != null) {
-            Logger.Info("Folder for removed files: " + arguments.removed);
-            if(!Directory.Exists(arguments.removed)) {
-                Logger.Warning("Folder for removed files does not exist, attempting creation");
-                try {
-                    Directory.CreateDirectory(arguments.removed);
-                    Logger.Success("Directory for removed files created");
-                }
-                catch(Exception e) {
-                    Logger.Error("Directory for removed files creation failed, error: " + e);
-                    return;
-                }
-            }
-            // Getting full path
-            if(Directory.Exists(arguments.removed)) arguments.removed = new FileInfo(arguments.removed).FullName;
-        }
-        else Logger.Info("Folder for removed files is not set, they will be permanently removed");
-        // Delay time
-        if(arguments.repeat) Logger.Info("Delay time: " + arguments.time.ToString() + "s");
-        else Logger.Info("Delay time not set, program will exit when backup will be finished");
+        arguments.path = new FileInfo(arguments.path).FullName;
+        // Algorithm
+        Logger.Info("Hashing algorithm: " + arguments.algorithm);
         // Log
         if(arguments.log) Logger.Info("Logging to file");
         // Extensions
         if(arguments.extensions != null) {
             if(arguments.allExtensions) {
-                Logger.Info("All extensions will be checked for content changes");
+                Logger.Info("All extensions will be processed");
             }
             else {
-                Logger.Info("File with the list of extensions to check for content changes: " + arguments.extensions);
+                Logger.Info("File with the list of extensions to be processed: " + arguments.extensions);
                 if(!File.Exists(arguments.extensions)) {
-                    Logger.Error("File with the list of extensions to check for content changes does not exist!");
+                    Logger.Error("File with the list of extensions to be processed does not exist!");
                     return;
                 }
                 try {
@@ -106,236 +70,36 @@ public class Program {
             }
         }
         else {
-            Logger.Info("Extension list not set, only file size will be used to compare files");
+            Logger.Info("Extension list not set, every file will be processed");
         }
-        // Compressed Backup
-        if(arguments.backup) {
-            Logger.Info("Compressed backup: yes");
-            backupFolder = arguments.destination + "-backups";
-            if(!Directory.Exists(backupFolder)) {
-                Logger.Warning("Folder for backups " + backupFolder + " does not exist, attempting creation");
-                try {
-                    Directory.CreateDirectory(backupFolder);
-                    Logger.Success("Created folder for backups");
-                }
-                catch(Exception e) {
-                    Logger.Error("Could not create folder for backups, error: " + e);
-                }
+        // Threads
+        Logger.Info("Number of threads: " + arguments.threads);
+        // Compare
+        if(arguments.compare != null) {
+            Logger.Info("Compare: " + arguments.compare);
+            if(!Directory.Exists(arguments.compare)) {
+                Logger.Error("Directory does not exist!");
+                return;
             }
-        }
-        else {
-            Logger.Info("Compressed backup: no");
         }
         while(true) {
             // Timestamp
-            timestamp = new DateTimeOffset(DateTime.UtcNow).ToUnixTimeSeconds() + arguments.time;
+            timestamp = new DateTimeOffset(DateTime.UtcNow).ToUnixTimeSeconds() + arguments.delay;
             // Scan folders
-            Logger.Info("Starting source and destination folders scan...");
-            Task<string[]> sourceTask = scanFolder(arguments.source, true);
-            Task<string[]> destinationTask = scanFolder(arguments.destination, false);
-            sourceList = await sourceTask;
-            destinationList = await destinationTask;
-            Logger.Success("Source and destination folders scanned: " + sourceList.Length + " and " + destinationList.Length + " items found");
-            // Build file info
-            Logger.Info("Building source and destination file info dictionaries...");
-            Task<Dictionary<string, DirectoryEntry>> sourceDictionaryTask = buildInfoDictionary(sourceList, arguments.source, true);
-            Task<Dictionary<string, DirectoryEntry>> destinationDictionaryTask = buildInfoDictionary(destinationList, arguments.destination, false);
-            sourceInfoDictionary = await sourceDictionaryTask;
-            destinationInfoDictionary = await destinationDictionaryTask;
-            Logger.Success("Source and destination file info dictionaries built");
-            sourceList = new string[0];
-            destinationList = new string[0];
-            // Items to copy
-            Logger.Info("Determining items to copy...");
-            filesToCopy = 0; foldersToCopy = 0; sizeToCopy = 0;
-            foreach(KeyValuePair<string, DirectoryEntry> entry in sourceInfoDictionary) {
-                DirectoryEntry value = entry.Value;
-                if(value.ToCopy(ref destinationInfoDictionary, arguments.allExtensions, extensionList)) {
-                    toCopyList = toCopyList.Append(value).ToArray();
-                    if((value.fileInfo.Attributes & FileAttributes.Directory) == FileAttributes.Directory) {
-                        foldersToCopy++;
-                    }
-                    else {
-                        filesToCopy++;
-                        sizeToCopy += (UInt64)value.fileInfo.Length;
-                    }
-                }
-            }
-            Logger.Success(foldersToCopy.ToString() + " folder" + (foldersToCopy == 1 ? "" : "s") + " and " +
-                filesToCopy.ToString() + " file" + (filesToCopy == 1 ? "" : "s") + " to copy (" +
-                Logger.HumanReadableSize(sizeToCopy) + ")");
-            // Items to remove
-            Logger.Info("Determining items to remove...");
-            filesToRemove = 0; foldersToRemove = 0; sizeToRemove = 0;
-            foreach(KeyValuePair<string, DirectoryEntry> entry in destinationInfoDictionary) {
-                DirectoryEntry value = entry.Value;
-                if(value.ToRemove(ref sourceInfoDictionary)) {
-                    if((value.fileInfo.Attributes & FileAttributes.Directory) == FileAttributes.Directory) {
-                        toRemoveFolderList = toRemoveFolderList.Append(value).ToArray();
-                        foldersToRemove++;
-                    }
-                    else {
-                        toRemoveFileList = toRemoveFileList.Append(value).ToArray();
-                        filesToRemove++;
-                        sizeToRemove += (UInt64)value.fileInfo.Length;
-                    }
-                }
-            }
-            Logger.Success(foldersToRemove.ToString() + " folder" + (foldersToRemove == 1 ? "" : "s") + " and " +
-                filesToRemove.ToString() + " file" + (filesToRemove == 1 ? "" : "s") + " to remove (" +
-                Logger.HumanReadableSize(sizeToRemove) + ")");
-            // Clear info lists
-            sourceInfoDictionary = new Dictionary<string, DirectoryEntry>();
-            destinationInfoDictionary = new Dictionary<string, DirectoryEntry>();
-            // Copy files
-            length = toCopyList.Length;
-            filesCopied = 0; foldersCopied = 0; sizeCopied = 0;
-            for(Int32 i = 0; i < length; i++) {
-                DirectoryEntry e = toCopyList[i];
-                bool isDirectory = (e.fileInfo.Attributes & FileAttributes.Directory) == FileAttributes.Directory;
-                UInt64 fileSize = (isDirectory ? 0 : (UInt64)e.fileInfo.Length);
-                Logger.InfoReason(e.reason, e.relativePath, (isDirectory ? null : fileSize));
-                Logger.ProgressBar(sizeCopied, sizeToCopy, foldersCopied + filesCopied, foldersToCopy + filesToCopy);
-                string destinationPath = arguments.destination + Path.DirectorySeparatorChar + e.relativePath;
-                if(isDirectory) { // Copy folder
-                    try {
-                        Directory.CreateDirectory(destinationPath);
-                        foldersCopied++;
-                        Logger.RemoveLine(); Logger.RemoveLine();
-                        Logger.SuccessReason(e.reason, e.relativePath);
-                    }
-                    catch(Exception exc) {
-                        foldersToCopy--;
-                        Logger.RemoveLine(); Logger.RemoveLine();
-                        Logger.Error("Could not copy: " + e.relativePath + ", error: " + exc);
-                    }
-                }
-                else { // Copy file
-                    try {
-                        File.Copy(e.fileInfo.FullName, destinationPath, true);
-                        filesCopied++;
-                        sizeCopied += fileSize;
-                        Logger.RemoveLine(); Logger.RemoveLine();
-                        Logger.SuccessReason(e.reason, e.relativePath, fileSize);
-                    }
-                    catch(Exception exc) {
-                        filesToCopy--;
-                        try {sizeToCopy -= fileSize;}
-                        catch(Exception) {}
-                        Logger.RemoveLine(); Logger.RemoveLine();
-                        Logger.Error("Could not copy: " + e.relativePath + ", error: " + exc);
-                    }
-                }
-            }
-            toCopyList = new DirectoryEntry[0];
-            // Remove files
-            length = toRemoveFileList.Length;
-            filesRemoved = 0; sizeRemoved = 0; foldersRemoved = 0;
-            for(Int32 i = 0; i < length; i++) {
-                DirectoryEntry e = toRemoveFileList[i];
-                UInt64 fileSize = (UInt64)e.fileInfo.Length;
-                bool err;
-                Logger.InfoReason(e.reason, e.relativePath, fileSize);
-                Logger.ProgressBar(sizeRemoved, sizeToRemove, foldersRemoved + filesRemoved, foldersToRemove + filesToRemove);
-                if(arguments.removed != null) { // Move
-                    string newPath = arguments.removed + Path.DirectorySeparatorChar + e.relativePath;
-                    try {
-                        File.Move(e.fileInfo.FullName, newPath, true);
-                        err = false;
-                    }
-                    catch(Exception exc1) {
-                        try {
-                            Directory.CreateDirectory(newPath.Substring(0, newPath.Length - e.fileInfo.Name.Length));
-                            File.Move(e.fileInfo.FullName, newPath);
-                            err = false;
-                        }
-                        catch(Exception exc2) {
-                            Logger.RemoveLine(); Logger.RemoveLine();
-                            Logger.Error("Could not remove: " + e.relativePath + ", error 1: " + exc1 + ", error 2: " + exc2);
-                            err = true;
-                        }
-                    }
-                }
-                else { // Completely remove
-                    try {
-                        File.Delete(e.fileInfo.FullName);
-                        err = false;
-                    }
-                    catch(Exception exc) {
-                        Logger.RemoveLine(); Logger.RemoveLine();
-                        Logger.Error("Could not remove: " + e.relativePath + ", error: " + exc);
-                        err = true;
-                    }
-                }
-                if(!err) {
-                    sizeRemoved += fileSize;
-                    filesRemoved++;
-                    Logger.RemoveLine(); Logger.RemoveLine();
-                    Logger.SuccessReason(e.reason, e.relativePath, fileSize);
-                }
-                else {
-                    filesToRemove--;
-                    try {sizeToRemove -= fileSize;}
-                    catch(Exception) {}
-                }
-            }
-            toRemoveFileList = new DirectoryEntry[0];
-            // Remove folders
-            length = toRemoveFolderList.Length;
-            for(Int32 i = length - 1; i >= 0; i--) {
-                DirectoryEntry e = toRemoveFolderList[i];
-                bool err;
-                Logger.InfoReason(e.reason, e.relativePath);
-                if(arguments.removed != null) { // Move
-                    string newPath = arguments.removed + Path.DirectorySeparatorChar + e.relativePath;
-                    try {
-                        Directory.CreateDirectory(newPath);
-                        Directory.Delete(e.fileInfo.FullName, true);
-                        err = false;
-                    }
-                    catch(Exception exc) {
-                        Logger.RemoveLine();
-                        Logger.Error("Could not remove: " + e.relativePath + ", error: " + exc);
-                        err = true;
-                    }
-                }
-                else { // Completely remove
-                    try {
-                        Directory.Delete(e.fileInfo.FullName, true);
-                        err = false;
-                    }
-                    catch(Exception exc) {
-                        Logger.RemoveLine();
-                        Logger.Error("Could not remove: " + e.relativePath + ", error: " + exc);
-                        err = true;
-                    }
-                }
-                if(!err) {
-                    foldersRemoved++;
-                    Logger.RemoveLine();
-                    Logger.SuccessReason(e.reason, e.relativePath);
-                }
-                else foldersToRemove--;
-            }
-            toRemoveFolderList = new DirectoryEntry[0];
-            // Log copied and removed items
-            Logger.Success(foldersCopied.ToString() + " folder" + (foldersRemoved == 1 ? "" : "s") + " and " +
-                filesCopied.ToString() + " file" + (filesCopied == 1 ? "" : "s") + " copied (" + Logger.HumanReadableSize(sizeCopied) +
-                "), " + foldersRemoved.ToString() + " folder" + (foldersRemoved == 1 ? "" : "s") + " and " +
-                filesRemoved.ToString() + " file" + (filesRemoved == 1 ? "" : "s") + " removed (" + Logger.HumanReadableSize(sizeRemoved) +
-                "), delta: " + (sizeCopied >= sizeRemoved ? "+" : "-") + Logger.HumanReadableSize((UInt64)Math.Abs((Int64)sizeCopied - (Int64)sizeRemoved)));
-            // Compressed backup
-            if(arguments.backup) {
-                string backupFileName = Logger.LongTimeString() + ".zip";
-                Logger.Info("Creating compressed backup: " + backupFileName);
-                backupFileName = backupFolder + Path.DirectorySeparatorChar + backupFileName;
-                try {
-                    ZipFile.CreateFromDirectory(arguments.source, backupFileName);
-                    Logger.Success("Created compressed backup (" + Logger.HumanReadableSize((UInt64)new FileInfo(backupFileName).Length) + ")");
-                }
-                catch(Exception e) {
-                    Logger.Error("Could not create compressed backup, error: " + e);
-                }
+            Logger.Info("Starting directory scan...");
+            Task<string[]> pathTask = scanFolder(arguments.path, true);
+            pathList = await pathTask;
+            Logger.Success("Directory scanned: " + pathList.Length + " items found");
+            // Build file info and load index
+            Logger.Info("Building file info dictionary and loading index...");
+            Task<Dictionary<string, DirectoryEntry>> sourceDictionaryTask = buildInfoDictionary(pathList, arguments.path, true);
+            Task<Dictionary<string, string>> indexDictionaryTask = loadIndex(arguments.path);
+            pathInfoDictionary = await sourceDictionaryTask;
+            indexDictionary = await indexDictionaryTask;
+            pathInfoDictionary.Remove("integrity-utility.index.json");
+            Logger.Success("File info dictionary built and index loaded");
+            foreach(KeyValuePair<string, string> indexEntry in indexDictionary) {
+                Logger.Success(indexEntry.Key + ": " + indexEntry.Value);
             }
             // Close log stream
             Logger.TerminateLogging();
@@ -390,6 +154,36 @@ public class Program {
             }
             catch(Exception e) {
                 Logger.Error("Error while building " + (type ? "source" : "destination") + " file info dictionary: " + e);
+                Environment.Exit(2);
+            }
+            return dictionary;
+        });
+    }
+    /// <summary>
+    /// Function to load the index from the json file
+    /// (<paramref name="path"/>)
+    /// </summary>
+    /// <param name="path">The folder path</param>
+    /// <returns>Returns the task of a Dictionary</returns>
+    public static async Task<Dictionary<string, string>> loadIndex(string path) {
+        return await Task.Run<Dictionary<string, string>>(() => {
+            Dictionary<string, string>? dictionary = new Dictionary<string, string>();
+            try {
+                string indexPath = Path.Join(path, "integrity-utility.index.json");
+                if(File.Exists(indexPath)) {
+                    string fileContent = File.ReadAllText(indexPath);
+                    dictionary = JsonConvert.DeserializeObject<Dictionary<string, string>>(fileContent);
+                    if(dictionary == null) {
+                        Logger.Warning("Unexpected index structure, using an empty index");
+                        return new Dictionary<string, string>();
+                    }
+                }
+                else {
+                    Logger.Warning("Index not found, this is ok if it's the first scan");
+                }
+            }
+            catch(Exception e) {
+                Logger.Error("Error while loading index of folder " + path + " : " + e);
                 Environment.Exit(2);
             }
             return dictionary;

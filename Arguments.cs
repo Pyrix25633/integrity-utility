@@ -3,20 +3,22 @@ public class Arguments {
     /// Initializer
     /// </summary>
     public Arguments() {
-        source = "";
-        destination = "";
-        errors = 0;
+        path = "";
+        algorithm = "SHA3-512";
+        extensions = "all";
+        threads = 4;
         repeat = false;
         log = false;
         help = false;
-        allExtensions = false;
-        backup = false;
+        allExtensions = true;
+        errors = 0;
     }
-    public string source, destination;
-    public string? removed, extensions;
-    public Int32 time;
-    public bool repeat, log, help, allExtensions, backup;
-    public Int16 errors; 
+    public string path, algorithm, extensions;
+    public Int16 threads;
+    public string? compare;
+    public Int32 delay;
+    public bool repeat, log, help, allExtensions;
+    public Int16 errors;
 
     /// <summary>
     /// Function to parse the arguments
@@ -30,35 +32,45 @@ public class Arguments {
         for(Int16 i = 0; i < length; i++) {
             if(args[i][0] == '-') {
                 switch(args[i]) {
-                    case "-s":
-                    case "--source":
-                        source = args[i + 1];
+                    case "-p":
+                    case "--path":
+                        path = args[i + 1];
                         break;
-                    case "-d":
-                    case "--destination":
-                        destination = args[i + 1];
+                    case "-a":
+                    case "--algorithm":
+                        algorithm = args[i + 1];
                         break;
-                    case "-r":
-                    case "--removed":
-                        removed = args[i + 1];
+                    case "-e":
+                    case "--extensions":
+                        extensions = args[i + 1];
+                        allExtensions = extensions == "all";
                         break;
                     case "-t":
-                    case "--time":
+                    case "--threads":
+                        string t = args[i + 1];
+                        errors += (Int16)(Int16.TryParse(t, out threads) ? 0 : 1);
+                        break;
+                    case "-c":
+                    case "--compare":
+                        compare = args[i + 1];
+                        break;
+                    case "-d":
+                    case "--delay":
                         string s = args[i + 1];
                         if(!char.IsNumber(s[s.Length - 1])) {
                             char unit = s[s.Length - 1];
                             s = s.Substring(0, s.Length - 1);
                             switch(unit) {
                                 case 's':
-                                    errors += (Int16)(Int32.TryParse(s, out time) ? 0 : 1);
+                                    errors += (Int16)(Int32.TryParse(s, out delay) ? 0 : 1);
                                     break;
                                 case 'm':
-                                    errors += (Int16)(Int32.TryParse(s, out time) ? 0 : 1);
-                                    time *= 60;
+                                    errors += (Int16)(Int32.TryParse(s, out delay) ? 0 : 1);
+                                    delay *= 60;
                                     break;
                                 case 'h':
-                                    errors += (Int16)(Int32.TryParse(s, out time) ? 0 : 1);
-                                    time *= 3600;
+                                    errors += (Int16)(Int32.TryParse(s, out delay) ? 0 : 1);
+                                    delay *= 3600;
                                     break;
                                 default:
                                     errors += 1;
@@ -66,26 +78,17 @@ public class Arguments {
                             }
                         }
                         else {
-                            errors += (Int16)(Int32.TryParse(s, out time) ? 0 : 1);
+                            errors += (Int16)(Int32.TryParse(s, out delay) ? 0 : 1);
                         }
                         repeat = true;
-                        break;
-                    case "-e":
-                    case "--extensions":
-                        extensions = args[i + 1];
-                        allExtensions = (extensions == "all");
                         break;
                     case "-l":
                     case "--log":
                         log = true;
                         break;
-                    case "-b":
-                    case "--backup":
-                        backup = true;
-                        break;
                     case "-f":
                     case "--file":
-                        string line = "backup-tool ";
+                        string line = "integrity-utility ";
                         foreach(string item in args) {
                             line += item + " ";
                         }
@@ -94,21 +97,26 @@ public class Arguments {
                     case "-h":
                     case "--help":
                         Console.ForegroundColor = ConsoleColor.Cyan;
-                        Console.WriteLine("Usage: backup-utility [ARGUMENTS]");
+                        Console.WriteLine("Usage: integrity-utility [ARGUMENTS]");
                         Console.WriteLine();
                         Console.ForegroundColor = ConsoleColor.Yellow;
                         Console.WriteLine("Mandatory arguments");
-                        Console.WriteLine("  -s, --source        [DIRECTORY]      The source folder");
-                        Console.WriteLine("  -d, --destination   [DIRECTORY]      The destination folder");
+                        Console.WriteLine("  -p, --path          [DIRECTORY]      The folder to scan");
                         Console.WriteLine();
                         Console.ForegroundColor = ConsoleColor.Green;
                         Console.WriteLine("Optional arguments");
-                        Console.WriteLine("  -r, --removed       [DIRECTORY]      The folder for removed files");
-                        Console.WriteLine("  -t, --time          [TIME]           The delay time, e.g. 100 or 100s or 15m or 7h");
-                        Console.WriteLine("  -e, --extensions    [FILENAME]       File with the list of extensions to check for content differences,");
+                        Console.WriteLine("  -a, --algorithm     [ALGORITHM]      The hashing algorithm, defaults to SHA3-512,");
+                        Console.WriteLine("                                       overridden by the algorithm used to create the index file if it exists");
+                        Console.WriteLine("                                       [ALGORITHM] = SHA-256 | SHA-512 | SHA3-256 | SHA3-512");
+                        Console.WriteLine("  -e, --extensions    [FILENAME]       File with the list of extensions to process");
+                        Console.WriteLine("                                       (every file with a different extension will be ignored),");
                         Console.WriteLine("                                       [FILENAME] = 'all' stands for all extensions");
+                        Console.WriteLine("  -t, --threads       [NUMBER]         The number of files that can be processes concurrently,");
+                        Console.WriteLine("                                       between 1 and 16, default 4");
+                        Console.WriteLine("  -c, --compare       [DIRECTORY]      The directory containing another index that will be compared");
+                        Console.WriteLine("                                       with the current one");
+                        Console.WriteLine("  -d, --delay         [TIME]           The delay time, e.g. 100 or 100s or 15m or 7h");
                         Console.WriteLine("  -l, --log                            Logs to file");
-                        Console.WriteLine("  -b, --backup                         Makes a compressed copy of the destination folder after the operation");
                         Console.WriteLine("  -f, --file          [FILENAME]       Saves the command to a script");
                         Console.WriteLine("  -h, --help                           Prints help message and exits");
                         Console.ResetColor();
@@ -122,6 +130,6 @@ public class Arguments {
                 }
             }
         }
-        if(source == "" || destination == "") errors += 1;
+        if(path == "") errors += 1;
     }
 }
