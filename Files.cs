@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+
 public class DirectoryEntry {
     /// <summary>
     /// Initializer
@@ -17,7 +19,7 @@ public class DirectoryEntry {
     /// <param name="allExtensions">If all extensions have to be checked for content differencies</param>
     /// <param name="extensions">The list of the extensions to check for content differencies</param>
     /// <returns>Returns true if the file has to be copied</returns>
-    public string Hash(bool allExtensions, string[] extensions) {
+    public string Hash(bool allExtensions, string[] extensions, HashAlgorithm hashAlgorithm) {
         // Check folder
         if((fileInfo.Attributes & FileAttributes.Directory) == FileAttributes.Directory) {
             // TODO
@@ -26,6 +28,7 @@ public class DirectoryEntry {
         if(!allExtensions) {
             if(!extensions.Contains(fileInfo.Extension)) return "";
         }
-
+        //TODO
+        return hashAlgorithm.ComputeHash()
     }
 }

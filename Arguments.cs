@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+
 public class Arguments {
     /// <summary>
     /// Initializer
@@ -19,7 +21,7 @@ public class Arguments {
     public Int32 delay;
     public bool repeat, log, help, allExtensions;
     public Int16 errors;
-
+    public HashAlgorithm hashAlgorithm = SHA3_512.Create();
     /// <summary>
     /// Function to parse the arguments
     /// </summary>
@@ -39,6 +41,35 @@ public class Arguments {
                     case "-a":
                     case "--algorithm":
                         algorithm = args[i + 1];
+                        switch(algorithm) {
+                            case "MD5":
+                                hashAlgorithm = MD5.Create();
+                                break;
+                            case "SHA-1":
+                                hashAlgorithm = SHA1.Create();
+                                break;
+                            case "SHA-256":
+                                hashAlgorithm = SHA256.Create();
+                                break;
+                            case "SHA-384":
+                                hashAlgorithm = SHA384.Create();
+                                break;
+                            case "SHA-512":
+                                hashAlgorithm = SHA512.Create();
+                                break;
+                            case "SHA3-256":
+                                hashAlgorithm = SHA3_256.Create();
+                                break;
+                            case "SHA3-384":
+                                hashAlgorithm = SHA3_384.Create();
+                                break;
+                            case "SHA3-512":
+                                hashAlgorithm = SHA3_512.Create();
+                                break;
+                            default:
+                                errors += 1;
+                                break;
+                        }
                         break;
                     case "-e":
                     case "--extensions":
@@ -106,8 +137,9 @@ public class Arguments {
                         Console.ForegroundColor = ConsoleColor.Green;
                         Console.WriteLine("Optional arguments");
                         Console.WriteLine("  -a, --algorithm     [ALGORITHM]      The hashing algorithm, defaults to SHA3-512,");
-                        Console.WriteLine("                                       overridden by the algorithm used to create the index file if it exists");
-                        Console.WriteLine("                                       [ALGORITHM] = SHA-256 | SHA-512 | SHA3-256 | SHA3-512");
+                        Console.WriteLine("                                       overridden by the algorithm used to create the index file if it exists,");
+                        Console.WriteLine("                                       [ALGORITHM] = MD5 | SHA1 | SHA-256 | SHA-384 | SHA-512 |");
+                        Console.WriteLine("                                                                 SHA3-256 | SHA3-384 | SHA3-512");
                         Console.WriteLine("  -e, --extensions    [FILENAME]       File with the list of extensions to process");
                         Console.WriteLine("                                       (every file with a different extension will be ignored),");
                         Console.WriteLine("                                       [FILENAME] = 'all' stands for all extensions");
