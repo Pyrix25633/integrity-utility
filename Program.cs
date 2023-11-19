@@ -14,6 +14,9 @@ public class Program {
         Dictionary<string, string> indexDictionary = new Dictionary<string, string>();
         enumOptions.RecurseSubdirectories = true; enumOptions.AttributesToSkip = default;
         // Other variables
+        Semaphore indexSemaphore = new Semaphore(1, 1);
+        Semaphore loggerSemaphore = new Semaphore(1, 1);
+        Semaphore threadSemaphore;
         Int64 timestamp;
         Int32 sleepTime;
         // Parsing arguments
@@ -74,6 +77,7 @@ public class Program {
         }
         // Threads
         Logger.Info("Number of threads: " + arguments.threads);
+        threadSemaphore = new Semaphore(arguments.threads, arguments.threads);
         // Compare
         if(arguments.compare != null) {
             Logger.Info("Compare: " + arguments.compare);
@@ -92,14 +96,19 @@ public class Program {
             Logger.Success("Directory scanned: " + pathList.Length + " items found");
             // Build file info and load index
             Logger.Info("Building file info dictionary and loading index...");
-            Task<Dictionary<string, DirectoryEntry>> sourceDictionaryTask = buildInfoDictionary(pathList, arguments.path, true);
-            Task<Dictionary<string, string>> indexDictionaryTask = loadIndex(arguments.path);
-            pathInfoDictionary = await sourceDictionaryTask;
+            Task<Dictionary<string, DirectoryEntry>> pathInfoDictionaryTask = buildInfoDictionary(pathList, arguments.path, true);
+            Task<Dictionary<string, string>> indexDictionaryTask = loadIndex(arguments.path, arguments.algorithm);
+            pathInfoDictionary = await pathInfoDictionaryTask;
             indexDictionary = await indexDictionaryTask;
             pathInfoDictionary.Remove("integrity-utility.index.json");
             Logger.Success("File info dictionary built and index loaded");
-            foreach(KeyValuePair<string, string> indexEntry in indexDictionary) {
-                Logger.Success(indexEntry.Key + ": " + indexEntry.Value);
+            foreach(KeyValuePair<string, DirectoryEntry> entry in pathInfoDictionary) {
+                if(threadSemaphore.WaitOne()) {
+                    new Thread(() => {
+                        
+                        threadSemaphore.Release();
+                    }).Start();
+                }
             }
             // Close log stream
             Logger.TerminateLogging();
@@ -161,15 +170,16 @@ public class Program {
     }
     /// <summary>
     /// Function to load the index from the json file
-    /// (<paramref name="path"/>)
+    /// (<paramref name="path"/>, <paramref name="algorithm"/>)
     /// </summary>
     /// <param name="path">The folder path</param>
+    /// <param name="algorithm">The algorithm argument</param>
     /// <returns>Returns the task of a Dictionary</returns>
-    public static async Task<Dictionary<string, string>> loadIndex(string path) {
+    public static async Task<Dictionary<string, string>> loadIndex(string path, string algorithm) {
         return await Task.Run<Dictionary<string, string>>(() => {
             Dictionary<string, string>? dictionary = new Dictionary<string, string>();
             try {
-                string indexPath = Path.Join(path, "integrity-utility.index.json");
+                string indexPath = Path.Join(path, "integrity-utility.index." + algorithm + ".json");
                 if(File.Exists(indexPath)) {
                     string fileContent = File.ReadAllText(indexPath);
                     dictionary = JsonConvert.DeserializeObject<Dictionary<string, string>>(fileContent);

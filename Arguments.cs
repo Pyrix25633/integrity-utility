@@ -9,6 +9,7 @@ public class Arguments {
         algorithm = "SHA3-512";
         extensions = "all";
         threads = 4;
+        update = false;
         repeat = false;
         log = false;
         help = false;
@@ -17,6 +18,7 @@ public class Arguments {
     }
     public string path, algorithm, extensions;
     public Int16 threads;
+    public bool update;
     public string? compare;
     public Int32 delay;
     public bool repeat, log, help, allExtensions;
@@ -80,6 +82,11 @@ public class Arguments {
                     case "--threads":
                         string t = args[i + 1];
                         errors += (Int16)(Int16.TryParse(t, out threads) ? 0 : 1);
+                        errors += (Int16)((threads < 1 || threads > 16) ? 1 : 0);
+                        break;
+                    case "-u":
+                    case "--update":
+                        update = true;
                         break;
                     case "-c":
                     case "--compare":
@@ -137,7 +144,6 @@ public class Arguments {
                         Console.ForegroundColor = ConsoleColor.Green;
                         Console.WriteLine("Optional arguments");
                         Console.WriteLine("  -a, --algorithm     [ALGORITHM]      The hashing algorithm, defaults to SHA3-512,");
-                        Console.WriteLine("                                       overridden by the algorithm used to create the index file if it exists,");
                         Console.WriteLine("                                       [ALGORITHM] = MD5 | SHA1 | SHA-256 | SHA-384 | SHA-512 |");
                         Console.WriteLine("                                                                 SHA3-256 | SHA3-384 | SHA3-512");
                         Console.WriteLine("  -e, --extensions    [FILENAME]       File with the list of extensions to process");
@@ -145,6 +151,7 @@ public class Arguments {
                         Console.WriteLine("                                       [FILENAME] = 'all' stands for all extensions");
                         Console.WriteLine("  -t, --threads       [NUMBER]         The number of files that can be processes concurrently,");
                         Console.WriteLine("                                       between 1 and 16, default 4");
+                        Console.WriteLine("  -u, --update                         Updates the index with the newly calculated hashes");
                         Console.WriteLine("  -c, --compare       [DIRECTORY]      The directory containing another index that will be compared");
                         Console.WriteLine("                                       with the current one");
                         Console.WriteLine("  -d, --delay         [TIME]           The delay time, e.g. 100 or 100s or 15m or 7h");
