@@ -17,8 +17,10 @@ public class Program {
         Semaphore indexSemaphore = new Semaphore(1, 1);
         Semaphore loggerSemaphore = new Semaphore(1, 1);
         Semaphore threadSemaphore;
-        Int64 timestamp;
-        Int32 sleepTime;
+        Semaphore elementsSemaphore = new Semaphore(1, 1);
+        ElementLog[] pendingLogs = new ElementLog[0];
+        Int64 timestamp, elementsTimestamp;
+        Int32 sleepTime, currentElements, totalElements;
         // Parsing arguments
         try {
             arguments.Parse(args);
@@ -102,10 +104,19 @@ public class Program {
             indexDictionary = await indexDictionaryTask;
             pathInfoDictionary.Remove("integrity-utility.index.json");
             Logger.Success("File info dictionary built and index loaded");
+            elementsTimestamp = new DateTimeOffset(DateTime.UtcNow).ToUnixTimeMilliseconds();
             foreach(KeyValuePair<string, DirectoryEntry> entry in pathInfoDictionary) {
                 if(threadSemaphore.WaitOne()) {
                     new Thread(() => {
-                        
+                        string? hash = entry.Value.Hash(arguments.allExtensions, extensionList, arguments.hashAlgorithm);
+                        if()
+                        try {
+                            string previousHash = indexDictionary[entry.Key];
+                        }
+                        catch(Exception e) {
+                            // Does not exist
+
+                        }
                         threadSemaphore.Release();
                     }).Start();
                 }
