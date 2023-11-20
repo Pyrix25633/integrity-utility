@@ -1,7 +1,6 @@
 using System.IO.Compression;
 
 public class Logger {
-    private static Semaphore semaphore = new Semaphore(1, 1);
     private static string barFull = "█", barEmpty = " ";
     private static string? logfilename;
     private static StreamWriter? logstream;
@@ -39,7 +38,6 @@ public class Logger {
     /// </summary>
     /// <param name="message">The message to output</param>
     public static void Success(string message) {
-        semaphore.WaitOne();
         string time = TimeString();
         Console.ForegroundColor = ConsoleColor.DarkGray;
         Console.Write(time);
@@ -49,7 +47,6 @@ public class Logger {
         Console.WriteLine(message);
         Console.ResetColor();
         if(logstream != null) logstream.WriteLineAsync(time + "(Success) " + message);
-        semaphore.Release();
     }
     /// <summary>
     /// Function to output an info message
@@ -57,7 +54,6 @@ public class Logger {
     /// </summary>
     /// <param name="message">The message to output</param>
     public static void Info(string message) {
-        semaphore.WaitOne();
         string time = TimeString();
         Console.ForegroundColor = ConsoleColor.DarkGray;
         Console.Write(time);
@@ -66,7 +62,6 @@ public class Logger {
         Console.ForegroundColor = ConsoleColor.White;
         Console.WriteLine(message);
         Console.ResetColor();
-        semaphore.Release();
     }
     /// <summary>
     /// Function to output a warning message
@@ -74,7 +69,6 @@ public class Logger {
     /// </summary>
     /// <param name="message">The message to output</param>
     public static void Warning(string message) {
-        semaphore.WaitOne();
         string time = TimeString();
         Console.ForegroundColor = ConsoleColor.DarkGray;
         Console.Write(time);
@@ -84,7 +78,6 @@ public class Logger {
         Console.WriteLine(message);
         Console.ResetColor();
         if(logstream != null) logstream.WriteLineAsync(time + "(Warning) " + message);
-        semaphore.Release();
     }
     /// <summary>
     /// Function to output an error message
@@ -92,7 +85,6 @@ public class Logger {
     /// </summary>
     /// <param name="message">The message to output</param>
     public static void Error(string message) {
-        semaphore.WaitOne();
         string time = TimeString();
         Console.ForegroundColor = ConsoleColor.DarkGray;
         Console.Write(time);
@@ -102,7 +94,6 @@ public class Logger {
         Console.WriteLine(message);
         Console.ResetColor();
         if(logstream != null) logstream.WriteLineAsync(time + "(Error) " + message);
-        semaphore.Release();
     }
     /// <summary>
     /// Function to clear the last console line
@@ -110,13 +101,11 @@ public class Logger {
     /// </summary>
     /// <param name="line">The line to remove, default 1</param>
     public static void RemoveLine(Int16 line = 1) {
-        semaphore.WaitOne();
         Int32 currentLineCursor = Console.CursorTop;
         Console.SetCursorPosition(0, currentLineCursor - line);
         for(Int32 i = 0; i < Console.WindowWidth; i++)
             Console.Write(" ");
         Console.SetCursorPosition(0, currentLineCursor - line);
-        semaphore.Release();
     }
     /// <summary>
     /// Function to get the string time
@@ -156,7 +145,6 @@ public class Logger {
         for(Int16 i = 1; i <= percent; i++) {
             bar += barFull;
         }
-        semaphore.WaitOne();
         Console.ForegroundColor = ConsoleColor.DarkYellow;
         Console.Write(bar);
         bar = "";
@@ -171,10 +159,35 @@ public class Logger {
         Console.ForegroundColor = ConsoleColor.DarkYellow;
         Console.WriteLine(bar);
         Console.ResetColor();
-        semaphore.Release();
     }
     /// <summary>
-    /// Function to print a progress bar string
+    /// Function to print a progress bar string, showing only item number progress
+    /// (<paramref name="currentElements"/>, <paramref name="totalElements"/>)
+    /// </summary>
+    /// <param name="currentElements">The current number of elements</param>
+    /// <param name="totalElements">The total number of elements</param>
+    public static void ProgressBarItemsOnly(Int32 currentElements, Int32 totalElements) {
+        string bar = "[";
+        Int16 percent = (Int16)((float)currentElements / totalElements * 100);
+        for(Int16 i = 1; i <= percent; i++) {
+            bar += barFull;
+        }
+        Console.ForegroundColor = ConsoleColor.DarkYellow;
+        Console.Write(bar);
+        bar = "";
+        for(Int16 i = (Int16)(percent + 1); i <= 100; i++) {
+            bar += barEmpty;
+        }
+        Console.BackgroundColor = ConsoleColor.DarkGray;
+        Console.Write(bar);
+        bar = "] " + percent.ToString() + "% (" + currentElements + "/" + totalElements + ")";
+        Console.ResetColor();
+        Console.ForegroundColor = ConsoleColor.DarkYellow;
+        Console.WriteLine(bar);
+        Console.ResetColor();
+    }
+    /// <summary>
+    /// Function to convert a file size into a readable format
     /// (<paramref name="size"/>)
     /// </summary>
     /// <param name="size">The size in bytes</param>

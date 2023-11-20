@@ -1,11 +1,19 @@
 public class ElementLog {
-    // TODO!!
+    /// <summary>
+    /// Initializer
+    /// (<paramref name="relativePath"/>, <paramref name="type"/>)
+    /// </summary>
+    /// <param name="relativePath">The relative path</param>
+    /// <param name="type">The log type</param>
     public ElementLog(string relativePath, LogType type) {
         this.relativePath = relativePath;
         this.type = type;
     }
     public string relativePath;
     public LogType type;
+    /// <summary>
+    /// Function to print it to console
+    /// </summary>
     public void Log() {
         switch(type) {
             case LogType.NEW_FILE:

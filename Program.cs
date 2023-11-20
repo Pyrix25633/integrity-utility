@@ -1,5 +1,6 @@
 using System;
 using System.IO.Compression;
+using System.Security.Cryptography;
 using Newtonsoft.Json;
 
 public class Program {
@@ -11,16 +12,17 @@ public class Program {
         // Lists and dictionaries
         string[] pathList = new string[0], extensionList = new string[0];
         Dictionary<string, DirectoryEntry> pathInfoDictionary = new Dictionary<string, DirectoryEntry>();
-        Dictionary<string, string> indexDictionary = new Dictionary<string, string>();
+        Dictionary<string, Dictionary<string, string>> indexDictionary = new Dictionary<string, Dictionary<string, string>>();
         enumOptions.RecurseSubdirectories = true; enumOptions.AttributesToSkip = default;
         // Other variables
         Semaphore indexSemaphore = new Semaphore(1, 1);
         Semaphore loggerSemaphore = new Semaphore(1, 1);
         Semaphore threadSemaphore;
-        Semaphore elementsSemaphore = new Semaphore(1, 1);
+        Semaphore progressSemaphore = new Semaphore(1, 1);
         ElementLog[] pendingLogs = new ElementLog[0];
         Int64 timestamp, elementsTimestamp;
-        Int32 sleepTime, currentElements, totalElements;
+        Int32 sleepTime, currentElements, totalElements, filesToCompute, filesComputed;
+        UInt64 sizeToCompute, sizeComputed;
         // Parsing arguments
         try {
             arguments.Parse(args);
@@ -97,30 +99,138 @@ public class Program {
             pathList = await pathTask;
             Logger.Success("Directory scanned: " + pathList.Length + " items found");
             // Build file info and load index
-            Logger.Info("Building file info dictionary and loading index...");
+            Logger.Info("Building file info dictionary and loading main index...");
             Task<Dictionary<string, DirectoryEntry>> pathInfoDictionaryTask = buildInfoDictionary(pathList, arguments.path, true);
-            Task<Dictionary<string, string>> indexDictionaryTask = loadIndex(arguments.path, arguments.algorithm);
+            Task<Dictionary<string, string>> indexDictionaryTask = loadIndex(arguments.path, arguments.algorithm, () => {
+                Logger.Warning("Index not found for folder " + arguments.path + ", this is ok if it's the first scan");
+            });
             pathInfoDictionary = await pathInfoDictionaryTask;
-            indexDictionary = await indexDictionaryTask;
+            indexDictionary[""] = await indexDictionaryTask;
             pathInfoDictionary.Remove("integrity-utility.index.json");
-            Logger.Success("File info dictionary built and index loaded");
+            Logger.Success("File info dictionary built and main index loaded");
+            Logger.Info("Searching and loading subfolders indexes");
+            currentElements = 0; totalElements = pathInfoDictionary.Count;
+            filesToCompute = 0; sizeToCompute = 0;
             elementsTimestamp = new DateTimeOffset(DateTime.UtcNow).ToUnixTimeMilliseconds();
+            Logger.ProgressBarItemsOnly(currentElements, totalElements);
+            foreach(KeyValuePair<string, DirectoryEntry> entry in pathInfoDictionary) {
+                DirectoryEntry value = entry.Value;
+                Int64 currentTimestamp = new DateTimeOffset(DateTime.UtcNow).ToUnixTimeMilliseconds();
+                if(currentTimestamp - elementsTimestamp >= 100) {
+                    Logger.RemoveLine();
+                    Logger.ProgressBarItemsOnly(currentElements, totalElements);
+                    elementsTimestamp = new DateTimeOffset(DateTime.UtcNow).ToUnixTimeMilliseconds();
+                }
+                if(value.IsFolder()) {
+                    // Should contain an index
+                    indexDictionary[value.relativePath] = await loadIndex(value.path, arguments.algorithm, () => {
+                        Logger.RemoveLine();
+                        Logger.Warning("Index not found for folder " + entry.Key + ", this is ok if it's the first scan");
+                        Logger.ProgressBarItemsOnly(currentElements, totalElements);
+                    });
+                    // And must be skipped
+                    pathInfoDictionary.Remove(entry.Key);
+                }
+                else if(value.fileInfo.Name == "integrity-utility.index." + arguments.algorithm + ".json") {
+                    // It's an index and must be skipped
+                    pathInfoDictionary.Remove(entry.Key);
+                }
+                else if(arguments.skip) {
+                    try {
+                        string? directoryName = Path.GetDirectoryName(value.relativePath);
+                        directoryName = directoryName == null ? "" : directoryName;
+                        string hash = indexDictionary[directoryName][value.fileInfo.Name];
+                        // Is in index and must be skipped
+                        pathInfoDictionary.Remove(entry.Key);
+                    }
+                    catch(Exception) {
+                        // Is not in index
+                        sizeToCompute += (UInt64)value.fileInfo.Length;
+                        filesToCompute++;
+                    }
+                }
+                else if(value.IsToBeIgnored(arguments.allExtensions, extensionList)) {
+                    pathInfoDictionary.Remove(entry.Key);
+                }
+                else {
+                    sizeToCompute += (UInt64)value.fileInfo.Length;
+                    filesToCompute++;
+                }
+                currentElements++;
+            }
+            Logger.RemoveLine();
+            Logger.Success("Subfolder indexes loaded, " + filesToCompute + " files to compute (" +
+                Logger.HumanReadableSize(sizeToCompute)+ ")");
+            filesComputed = 0; sizeComputed = 0;
+            elementsTimestamp = new DateTimeOffset(DateTime.UtcNow).ToUnixTimeMilliseconds();
+            Logger.ProgressBar(sizeComputed, sizeToCompute, filesComputed, filesToCompute);
             foreach(KeyValuePair<string, DirectoryEntry> entry in pathInfoDictionary) {
                 if(threadSemaphore.WaitOne()) {
                     new Thread(() => {
+                        DirectoryEntry value = entry.Value;
+                        HashAlgorithm hashAlgorithmCopy = arguments.GetHashAlgorithmCopy();
+                        /*Int64 currentTimestamp = new DateTimeOffset(DateTime.UtcNow).ToUnixTimeMilliseconds();
+                        if(currentTimestamp - elementsTimestamp <= 100) {
+                            if(loggerSemaphore.WaitOne()) {
+                                Logger.RemoveLine();
+                                Logger.ProgressBar(sizeComputed, sizeToCompute, filesComputed, filesToCompute);
+                                loggerSemaphore.Release();
+                            }
+                        }*/
                         string? hash = entry.Value.Hash(arguments.allExtensions, extensionList, arguments.hashAlgorithm);
-                        if()
-                        try {
-                            string previousHash = indexDictionary[entry.Key];
+                        if(loggerSemaphore.WaitOne()) {
+                            Logger.Success(value.relativePath + ": " + hash);
+                            loggerSemaphore.Release();
                         }
-                        catch(Exception e) {
-                            // Does not exist
-
+                        if(hash == null) {
+                            threadSemaphore.Release();
+                            return;
+                        }
+                        if(progressSemaphore.WaitOne()) {
+                            filesComputed++;
+                            sizeComputed += (UInt64)value.fileInfo.Length;
+                            progressSemaphore.Release();
+                        }
+                        string? directoryName = Path.GetDirectoryName(value.relativePath);
+                        directoryName = directoryName == null ? "" : directoryName;
+                        try {
+                            string previousHash;
+                            if(indexSemaphore.WaitOne()) {
+                                previousHash = indexDictionary[directoryName][value.fileInfo.Name];
+                                if(hash != previousHash) {
+                                    indexDictionary[directoryName][value.fileInfo.Name] = hash;
+                                    /*if(loggerSemaphore.WaitOne()) {
+                                        Logger.RemoveLine();
+                                        Logger.Warning("Different hash for file " + value.relativePath);
+                                        Logger.ProgressBar(sizeComputed, sizeToCompute, filesComputed, filesToCompute);
+                                        loggerSemaphore.Release();
+                                    }*/
+                                }
+                                indexSemaphore.Release();
+                            }
+                        }
+                        catch(Exception) {
+                            // New file
+                            if(indexSemaphore.WaitOne()) {
+                                indexDictionary[directoryName][value.fileInfo.Name] = hash;
+                                indexSemaphore.Release();
+                            }
+                            /*if(loggerSemaphore.WaitOne()) {
+                                Logger.RemoveLine();
+                                Logger.Success("New file " + value.relativePath);
+                                Logger.ProgressBar(sizeComputed, sizeToCompute, filesComputed, filesToCompute);
+                                loggerSemaphore.Release();
+                            }*/
                         }
                         threadSemaphore.Release();
+                        if(loggerSemaphore.WaitOne()) {
+                            Logger.Success("Released " + entry.Key);
+                            loggerSemaphore.Release();
+                        }
                     }).Start();
                 }
             }
+            Logger.RemoveLine();
             // Close log stream
             Logger.TerminateLogging();
             if(!arguments.repeat) break;
@@ -186,7 +296,7 @@ public class Program {
     /// <param name="path">The folder path</param>
     /// <param name="algorithm">The algorithm argument</param>
     /// <returns>Returns the task of a Dictionary</returns>
-    public static async Task<Dictionary<string, string>> loadIndex(string path, string algorithm) {
+    public static async Task<Dictionary<string, string>> loadIndex(string path, string algorithm, Action fails) {
         return await Task.Run<Dictionary<string, string>>(() => {
             Dictionary<string, string>? dictionary = new Dictionary<string, string>();
             try {
@@ -200,7 +310,7 @@ public class Program {
                     }
                 }
                 else {
-                    Logger.Warning("Index not found, this is ok if it's the first scan");
+                    fails();
                 }
             }
             catch(Exception e) {

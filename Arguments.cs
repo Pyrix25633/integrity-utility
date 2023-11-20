@@ -10,6 +10,7 @@ public class Arguments {
         extensions = "all";
         threads = 4;
         update = false;
+        skip = false;
         repeat = false;
         log = false;
         help = false;
@@ -20,6 +21,7 @@ public class Arguments {
     public Int16 threads;
     public bool update;
     public string? compare;
+    public bool skip;
     public Int32 delay;
     public bool repeat, log, help, allExtensions;
     public Int16 errors;
@@ -88,6 +90,10 @@ public class Arguments {
                     case "--update":
                         update = true;
                         break;
+                    case "-s":
+                    case "--skip":
+                        skip = true;
+                        break;
                     case "-c":
                     case "--compare":
                         compare = args[i + 1];
@@ -152,6 +158,7 @@ public class Arguments {
                         Console.WriteLine("  -t, --threads       [NUMBER]         The number of files that can be processes concurrently,");
                         Console.WriteLine("                                       between 1 and 16, default 4");
                         Console.WriteLine("  -u, --update                         Updates the index with the newly calculated hashes");
+                        Console.WriteLine("  -s, --skip                           Every file already in the index is skipped");
                         Console.WriteLine("  -c, --compare       [DIRECTORY]      The directory containing another index that will be compared");
                         Console.WriteLine("                                       with the current one");
                         Console.WriteLine("  -d, --delay         [TIME]           The delay time, e.g. 100 or 100s or 15m or 7h");
@@ -170,5 +177,27 @@ public class Arguments {
             }
         }
         if(path == "") errors += 1;
+    }
+    public HashAlgorithm GetHashAlgorithmCopy() {
+        switch(algorithm) {
+            case "MD5":
+                return MD5.Create();
+            case "SHA-1":
+                return SHA1.Create();
+            case "SHA-256":
+                return SHA256.Create();
+            case "SHA-384":
+                return SHA384.Create();
+            case "SHA-512":
+                return SHA512.Create();
+            case "SHA3-256":
+                return SHA3_256.Create();
+            case "SHA3-384":
+                return SHA3_384.Create();
+            case "SHA3-512":
+                return SHA3_512.Create();
+            default:
+                throw(new Exception("Unknown algorithm: " + algorithm));
+        }
     }
 }

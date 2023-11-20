@@ -24,6 +24,7 @@ Optional arguments
 `-t, --threads [NUMBER] The number of files that can be processes concurrently, between 1 and 16, default 4`  
 `-u, --update Updates the index with the newly calculated hashes`  
 `-c, --compare [DIRECTORY] The directory containing another index that will be compared with the current one`  
+`-s, --skip Every file already in the index is skipped`  
 `-d, --delay [TIME] The delay time, e.g. 100 or 100s or 15m or 7h`  
 `-l, --log Logs to file`  
 `-f, --file [FILENAME] Saves the command to a script`  
