@@ -19,6 +19,7 @@ public class Program {
         Semaphore loggerSemaphore = new Semaphore(1, 1);
         Semaphore threadSemaphore;
         Semaphore progressSemaphore = new Semaphore(1, 1);
+        Semaphore logsSemaphore = new Semaphore(1, 1);
         ElementLog[] pendingLogs = new ElementLog[0];
         Int64 timestamp, elementsTimestamp;
         Int32 sleepTime, currentElements, totalElements, filesToCompute, filesComputed;
@@ -168,20 +169,21 @@ public class Program {
                 if(threadSemaphore.WaitOne()) {
                     new Thread(() => {
                         DirectoryEntry value = entry.Value;
-                        HashAlgorithm hashAlgorithmCopy = arguments.GetHashAlgorithmCopy();
-                        /*Int64 currentTimestamp = new DateTimeOffset(DateTime.UtcNow).ToUnixTimeMilliseconds();
+                        Int64 currentTimestamp = new DateTimeOffset(DateTime.UtcNow).ToUnixTimeMilliseconds();
                         if(currentTimestamp - elementsTimestamp <= 100) {
                             if(loggerSemaphore.WaitOne()) {
                                 Logger.RemoveLine();
+                                if(logsSemaphore.WaitOne()) {
+                                    foreach(ElementLog log in pendingLogs)
+                                        log.Log();
+                                    pendingLogs = new ElementLog[0];
+                                    logsSemaphore.Release();
+                                }
                                 Logger.ProgressBar(sizeComputed, sizeToCompute, filesComputed, filesToCompute);
                                 loggerSemaphore.Release();
                             }
-                        }*/
-                        string? hash = entry.Value.Hash(arguments.allExtensions, extensionList, arguments.hashAlgorithm);
-                        if(loggerSemaphore.WaitOne()) {
-                            Logger.Success(value.relativePath + ": " + hash);
-                            loggerSemaphore.Release();
                         }
+                        string? hash = entry.Value.Hash(arguments.allExtensions, extensionList, arguments.hashAlgorithm);
                         if(hash == null) {
                             threadSemaphore.Release();
                             return;
@@ -199,38 +201,35 @@ public class Program {
                                 previousHash = indexDictionary[directoryName][value.fileInfo.Name];
                                 if(hash != previousHash) {
                                     indexDictionary[directoryName][value.fileInfo.Name] = hash;
-                                    /*if(loggerSemaphore.WaitOne()) {
-                                        Logger.RemoveLine();
-                                        Logger.Warning("Different hash for file " + value.relativePath);
-                                        Logger.ProgressBar(sizeComputed, sizeToCompute, filesComputed, filesToCompute);
-                                        loggerSemaphore.Release();
-                                    }*/
+                                    indexSemaphore.Release();
+                                    if(logsSemaphore.WaitOne()) {
+                                        pendingLogs = pendingLogs.Append(new ElementLog(value.relativePath, LogType.DIFFERENT_HASH)).ToArray();
+                                        logsSemaphore.Release();
+                                    }
                                 }
-                                indexSemaphore.Release();
+                                else indexSemaphore.Release();
                             }
                         }
                         catch(Exception) {
                             // New file
+                            indexSemaphore.Release();
                             if(indexSemaphore.WaitOne()) {
                                 indexDictionary[directoryName][value.fileInfo.Name] = hash;
                                 indexSemaphore.Release();
                             }
-                            /*if(loggerSemaphore.WaitOne()) {
-                                Logger.RemoveLine();
-                                Logger.Success("New file " + value.relativePath);
-                                Logger.ProgressBar(sizeComputed, sizeToCompute, filesComputed, filesToCompute);
-                                loggerSemaphore.Release();
-                            }*/
+                            if(logsSemaphore.WaitOne()) {
+                                pendingLogs = pendingLogs.Append(new ElementLog(value.relativePath, LogType.NEW_FILE)).ToArray();
+                                logsSemaphore.Release();
+                            }
                         }
                         threadSemaphore.Release();
-                        if(loggerSemaphore.WaitOne()) {
-                            Logger.Success("Released " + entry.Key);
-                            loggerSemaphore.Release();
-                        }
                     }).Start();
                 }
             }
             Logger.RemoveLine();
+            foreach(ElementLog log in pendingLogs)
+                log.Log();
+            pendingLogs = new ElementLog[0];
             // Close log stream
             Logger.TerminateLogging();
             if(!arguments.repeat) break;
