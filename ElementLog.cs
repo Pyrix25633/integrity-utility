@@ -17,13 +17,19 @@ public class ElementLog {
     public void Log() {
         switch(type) {
             case LogType.NEW_FILE:
-                Logger.Success("New file: " + relativePath);
+                Logger.Success("Detected new file: " + relativePath);
+                break;
+            case LogType.NEW_FOLDER:
+                Logger.Success("Detected new folder: " + relativePath);
                 break;
             case LogType.DELETED_FILE:
-                Logger.Warning("Deleted file: " + relativePath);
+                Logger.Warning("Detected deleted file: " + relativePath);
+                break;
+            case LogType.DELETED_FOLDER:
+                Logger.Warning("Detected deleted folder: " + relativePath);
                 break;
             case LogType.DIFFERENT_HASH:
-                Logger.Warning("Different hash for file: " + relativePath);
+                Logger.Warning("Detected different hash for file: " + relativePath);
                 break;
         }
     }
@@ -31,6 +37,8 @@ public class ElementLog {
 
 public enum LogType {
     NEW_FILE = 1,
-    DELETED_FILE = 2,
-    DIFFERENT_HASH = 3
+    NEW_FOLDER = 2,
+    DELETED_FILE = 3,
+    DELETED_FOLDER = 4,
+    DIFFERENT_HASH = 5
 }

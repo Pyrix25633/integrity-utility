@@ -6,8 +6,7 @@
 
 Integrity utility creates an index with the hashes of selected files using the given algorithm.  
 When you run it again it will recalculate the hashes and compare them giving you a feedback for possibly currupted files or changes.  
-If a new file is detected an entry will be automatically created in the index. If a file is removed its entry will be automatically removed from the index.  
-If an option is given the index will be updated with the newly calculated digests, otherwise it will be left unchanged (except for new and deleted files).
+If an option is given the index will be updated with the newly calculated digests fox already existing files, the new files will be added to the index and the deleted files will be removed from the index otherwise it will be left unchanged.
 
 ### How to use it:
 

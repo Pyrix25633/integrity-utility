@@ -41,10 +41,10 @@ public class DirectoryEntry {
     /// <param name="allExtensions">If all extensions have to be checked for content differencies</param>
     /// <param name="extensions">The list of the extensions to check for content differencies</param>
     /// <param name="hashAlgorithm">The hash algorithm</param>
-    /// <returns>Returns the computed hash or null if it is either a folder or its extension is not in the extension list</returns>
+    /// <returns>Returns the computed hash, an empty string if it is a folder or null if its extension is not in the extension list</returns>
     public string? Hash(bool allExtensions, string[] extensions, HashAlgorithm hashAlgorithm) {
         // Check folder
-        if(IsFolder()) return null;
+        if(IsFolder()) return "";
         // Check extension
         if(IsToBeIgnored(allExtensions, extensions)) return null;
         // Read file and compute hash
