@@ -22,7 +22,7 @@ Optional arguments
 `-e, --extensions [FILENAME] File with the list of extensions to process (every file with a different extension will be ignored), [FILENAME] = 'all' stands for all extensions and is the default if -e is not specified`  
 `-t, --threads [NUMBER] The number of files that can be processes concurrently, between 1 and 16, default 4`  
 `-u, --update Updates the index with the newly calculated hashes`  
-`-c, --compare [DIRECTORY] The directory containing another index that will be compared with the current one`  
+`-c, --compare [DIRECTORY] The directory containing another index that will be compared to the current one, every other part of the program will not be executed if set`  
 `-s, --skip Every file already in the index is skipped`  
 `-d, --delay [TIME] The delay time, e.g. 100 or 100s or 15m or 7h`  
 `-l, --log Logs to file`  

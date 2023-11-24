@@ -160,7 +160,8 @@ public class Arguments {
                         Console.WriteLine("  -u, --update                         Updates the index with the newly calculated hashes");
                         Console.WriteLine("  -s, --skip                           Every file already in the index is skipped");
                         Console.WriteLine("  -c, --compare       [DIRECTORY]      The directory containing another index that will be compared");
-                        Console.WriteLine("                                       with the current one");
+                        Console.WriteLine("                                       to the current one, every other part of the program will not");
+                        Console.WriteLine("                                       be executed if set");
                         Console.WriteLine("  -d, --delay         [TIME]           The delay time, e.g. 100 or 100s or 15m or 7h");
                         Console.WriteLine("  -l, --log                            Logs to file");
                         Console.WriteLine("  -f, --file          [FILENAME]       Saves the command to a script");
@@ -197,7 +198,7 @@ public class Arguments {
             case "SHA3-512":
                 return SHA3_512.Create();
             default:
-                throw(new Exception("Unknown algorithm: " + algorithm));
+                throw new Exception("Unknown algorithm: " + algorithm);
         }
     }
 }
