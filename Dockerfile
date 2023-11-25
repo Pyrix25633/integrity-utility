@@ -1,6 +1,7 @@
 FROM mcr.microsoft.com/dotnet/sdk:8.0
 
 RUN apt-get -y update
+RUN apt-get -y install zip
 WORKDIR /app
 COPY *.csproj ./
 RUN dotnet restore

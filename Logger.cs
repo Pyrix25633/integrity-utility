@@ -46,7 +46,7 @@ public class Logger {
         Console.ForegroundColor = ConsoleColor.White;
         Console.WriteLine(message);
         Console.ResetColor();
-        if(logstream != null) logstream.WriteLineAsync(time + "(Success) " + message);
+        if(logstream != null) logstream.WriteLine(time + "(Success) " + message);
     }
     /// <summary>
     /// Function to output an info message
@@ -77,7 +77,7 @@ public class Logger {
         Console.ForegroundColor = ConsoleColor.White;
         Console.WriteLine(message);
         Console.ResetColor();
-        if(logstream != null) logstream.WriteLineAsync(time + "(Warning) " + message);
+        if(logstream != null) logstream.WriteLine(time + "(Warning) " + message);
     }
     /// <summary>
     /// Function to output an error message
@@ -93,7 +93,7 @@ public class Logger {
         Console.ForegroundColor = ConsoleColor.White;
         Console.WriteLine(message);
         Console.ResetColor();
-        if(logstream != null) logstream.WriteLineAsync(time + "(Error) " + message);
+        if(logstream != null) logstream.WriteLine(time + "(Error) " + message);
     }
     /// <summary>
     /// Function to clear the last console line

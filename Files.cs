@@ -25,8 +25,8 @@ public class DirectoryEntry {
     /// <summary>
     /// Function to check if the entry is to be ignored
     /// </summary>
-    /// <param name="allExtensions"></param>
-    /// <param name="extensions"></param>
+    /// <param name="allExtensions">If all extensions should be computed</param>
+    /// <param name="extensions">The list of extensions to be computed</param>
     /// <returns></returns>
     public bool IsToBeIgnored(bool allExtensions, string[] extensions) {
         if(!allExtensions) {

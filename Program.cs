@@ -174,20 +174,25 @@ public class Program {
                         pathInfoDictionary.Remove(entry.Key);
                     }
                     else if(arguments.skip) {
-                        try {
-                            string? directoryName = Path.GetDirectoryName(value.relativePath);
-                            directoryName = directoryName == null ? "" : directoryName;
-                            string hash = indexDictionary[directoryName][value.fileInfo.Name];
-                            // Is in index and must be skipped
+                        if(value.IsToBeIgnored(arguments.allExtensions, extensionList))
                             pathInfoDictionary.Remove(entry.Key);
-                            // Remove it from the index
-                            indexDictionaryCopy[directoryName].Remove(value.fileInfo.Name);
+                        else {
+                            try {
+                                string? directoryName = Path.GetDirectoryName(value.relativePath);
+                                directoryName = directoryName == null ? "" : directoryName;
+                                string hash = indexDictionary[directoryName][value.fileInfo.Name];
+                                // Is in index and must be skipped
+                                pathInfoDictionary.Remove(entry.Key);
+                                // Remove it from the index
+                                indexDictionaryCopy[directoryName].Remove(value.fileInfo.Name);
+                            }
+                            catch(Exception) {
+                                // Is not in index
+                                sizeToCompute += (UInt64)value.fileInfo.Length;
+                                filesToCompute++;
+                            }
                         }
-                        catch(Exception) {
-                            // Is not in index
-                            sizeToCompute += (UInt64)value.fileInfo.Length;
-                            filesToCompute++;
-                        }
+                        
                     }
                     else if(value.IsToBeIgnored(arguments.allExtensions, extensionList)) {
                         pathInfoDictionary.Remove(entry.Key);

@@ -21,7 +21,7 @@ run-container:
 > chown -R pyrix25633:pyrix25633 ./transfer/docker/*
 
 run-dotnet-debug:
-> dotnet ./transfer/docker/debug/integrity-utility.dll -- -p /media/pyrix25633/Seagate\ Basic/Pictures1/2014-07-14 -a SHA3-512 -t 16 -u -l
+> dotnet ./transfer/docker/debug/integrity-utility.dll -- -p /media/pyrix25633/Seagate\ Basic/Pictures1/2014-09-15 -a SHA3-512 -t 16 -u -l -s -f test.sh
 
 run-dotnet-release:
-> ./transfer/docker/release/linux-x64/integrity-utility -s test/source -d test/destination -r test/removed -l -e extensions.txt
+> ./transfer/docker/release/linux-x64/integrity-utility --help
