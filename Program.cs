@@ -8,7 +8,7 @@ public class Program {
     private static EnumerationOptions enumOptions = new EnumerationOptions();
     static async Task Main(string[] args) {
         // Version
-        string version = "1.0.0";
+        string version = "1.0.1";
         // Lists and dictionaries
         string[] pathList = new string[0], extensionList = new string[0];
         Dictionary<string, DirectoryEntry> pathInfoDictionary = new Dictionary<string, DirectoryEntry>();
@@ -55,6 +55,8 @@ public class Program {
         }
         // Getting full path
         arguments.path = new FileInfo(arguments.path).FullName;
+        char c = arguments.path[arguments.path.Length - 1];
+        if(c == '/' || c == '\\') arguments.path = arguments.path.Substring(0, arguments.path.Length - 1);
         // Algorithm
         Logger.Info("Hashing algorithm: " + arguments.algorithm);
         // Extensions
